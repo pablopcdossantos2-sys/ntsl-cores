@@ -1,30 +1,26 @@
 # NTSL Cores
 
-Seletor de cores RGB para gerar declarações e atribuições compatíveis com indicadores NTSL.
+Aplicativo desktop para escolher cores RGB e consultar constantes de cores nativas da linguagem NTSL, gerando o trecho de código pronto para colar em indicadores.
 
-## Requisitos
+## Recursos
 
-- Python 3.9 ou superior
-- Tkinter (normalmente incluído na instalação padrão do Python)
+- Aba **Seletor RGB**: escolha por diálogo de cores ou ajuste dos canais vermelho, verde e azul (0–255).
+- Aba **Cores nativas**: lista pesquisável das constantes documentadas no Manual NTSL, com amostra visual.
+- Campo para nome da variável NTSL.
+- Geração automática da declaração `integer` e da atribuição RGB ou da constante nativa.
+- Cópia do código completo para a área de transferência.
 
-Não há dependências Python externas.
+## Executar pelo Python
 
-## Como executar
-
-No Windows, abra o terminal na pasta do projeto e execute:
+Requisitos: Python 3.9+ com Tkinter.
 
 ```bash
 python main.py
 ```
 
-## Como usar
+Não são necessárias dependências externas.
 
-1. Escolha uma cor pelo botão **Escolher cor...** ou ajuste os controles Vermelho, Verde e Azul.
-2. Informe o nome da variável NTSL.
-3. Confira a declaração e a atribuição geradas.
-4. Clique em **Copiar código NTSL** e cole no editor do indicador.
-
-O código gerado segue este formato:
+## Exemplo de código RGB
 
 ```pascal
 var
@@ -34,12 +30,38 @@ begin
   // RGB(Vermelho, Verde, Azul)
   // Números inteiros entre 0 e 255
   cor := RGB(115,65,30);
+
+end;
 ```
 
-## Portabilidade
+## Exemplo com cor nativa
 
-O aplicativo usa apenas a biblioteca padrão do Python e não precisa de conexão com a internet. Para distribuir como executável Windows sem exigir Python instalado, pode-se empacotar com PyInstaller:
+```pascal
+var
+  cor : integer;
 
-```bash
-pyinstaller --onefile --windowed main.py
+begin
+  // Cor vermelha nativa
+  cor := clVermelho;
+
+end;
 ```
+
+O aplicativo também apresenta identificadores encontrados em exemplos do manual (como `clRed`, `clGreen` e `clWhite`) em uma seção separada da relação principal da seção 4.7.
+
+## Executável portátil para Windows
+
+O GitHub Actions compila o programa em um executável Windows de arquivo único, sem janela de terminal, usando PyInstaller. O executável não exige que o usuário instale Python.
+
+Para publicar uma versão:
+1. Abra a aba **Actions** do repositório.
+2. Selecione **Build and publish Windows release**.
+3. Clique em **Run workflow**.
+4. Informe a versão, por exemplo `v1.0.0`.
+5. Após a conclusão, abra **Releases** e baixe `NTSL-Cores.exe`.
+
+Também é possível disparar a publicação criando e enviando uma tag no formato `v*`.
+
+## Fonte das constantes
+
+A relação principal de cores nativas foi transcrita da seção 4.7 (Constantes), página 14, do Manual NTSL fornecido para este projeto. As amostras hexadecimais são apenas aproximações para visualização; o aplicativo gera o identificador NTSL, não um valor RGB, ao selecionar uma constante nativa.
