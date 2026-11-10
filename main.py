@@ -79,7 +79,7 @@ class NTSLCoresApp(ctk.CTk):
         self.geometry(f"{ww}x{wh}+{(sw-ww)//2}+{(sh-wh)//2}")
 
         self.variable_name = tk.StringVar(value="cor")
-        self.rgb = {"r": 115, "g": 65, "b": 30}
+        self.rgb = {"r": 135, "g": 206, "b": 235}
         self.rgb_vars = {k: tk.IntVar(value=v) for k, v in self.rgb.items()}
         self.rgb_entries = {}
         self.rgb_sliders = {}
@@ -287,14 +287,14 @@ class NTSLCoresApp(ctk.CTk):
         preview = self._card(page)
         preview.grid(row=0, column=0, sticky="nsew", padx=(0, 9), pady=(0, 12))
         self._label(preview, "PRÉ-VISUALIZAÇÃO", 9, self.MUTED, "bold").pack(anchor="w", padx=22, pady=(22, 0))
-        self.preview_swatch = ctk.CTkFrame(preview, height=190, corner_radius=15,
-                                           fg_color="#73411e")
-        self.preview_swatch.pack(fill="x", padx=22, pady=(18, 20))
+        self.preview_swatch = ctk.CTkFrame(preview, width=176, height=176, corner_radius=15,
+                                           fg_color="#87ceeb")
+        self.preview_swatch.pack(anchor="center", pady=(18, 20))
         self.preview_swatch.pack_propagate(False)
-        self.preview_hex = self._label(preview, "#73411E", 24, "#ffffff", "bold")
-        self.preview_hex.pack(anchor="w", padx=22)
-        self.preview_rgb = self._label(preview, "RGB  115   65   30", 11, self.MUTED)
-        self.preview_rgb.pack(anchor="w", padx=22, pady=(7, 0))
+        self.preview_hex = self._label(preview, "#87CEEB", 24, "#ffffff", "bold")
+        self.preview_hex.pack(anchor="center")
+        self.preview_rgb = self._label(preview, "RGB  135   206   235", 11, self.MUTED)
+        self.preview_rgb.pack(anchor="center", pady=(7, 0))
         self._button(preview, "Abrir seletor do sistema", self._choose_color,
                      "secondary").pack(fill="x", padx=22, pady=(22, 22))
 
@@ -336,12 +336,12 @@ class NTSLCoresApp(ctk.CTk):
         page.grid_columnconfigure(0, weight=1)
         search_card = self._card(page)
         search_card.grid(row=0, column=0, sticky="ew", pady=(0, 12))
-        self._label(search_card, "ENCONTRE UMA CONSTANTE", 9, self.MUTED, "bold").pack(anchor="w")
+        self._label(search_card, "ENCONTRE UMA CONSTANTE", 9, self.MUTED, "bold").pack(anchor="w", padx=18, pady=(16, 0))
         self.native_search = ctk.CTkEntry(search_card, textvariable=self.search_var,
                                           placeholder_text="Pesquisar por nome ou identificador...",
                                           height=38, fg_color="#12161d",
                                           border_color=self.BORDER)
-        self.native_search.pack(fill="x", pady=(9, 0))
+        self.native_search.pack(fill="x", padx=18, pady=(9, 16))
         self.search_var.trace_add("write", lambda *_: self._render_native_cards())
         self.native_scroll = ctk.CTkScrollableFrame(page, fg_color="transparent",
                                                     corner_radius=0)
@@ -355,26 +355,13 @@ class NTSLCoresApp(ctk.CTk):
         page = self._page_frame("favorites")
         page.grid_rowconfigure(1, weight=1)
         page.grid_columnconfigure(0, weight=1)
-        add = self._card(page)
-        add.grid(row=0, column=0, sticky="ew", pady=(0, 12))
-        self._label(add, "SALVAR COR ATUAL", 9, self.MUTED, "bold").pack(anchor="w")
-        row = ctk.CTkFrame(add, fg_color="transparent")
-        row.pack(fill="x", pady=(9, 0))
-        self.favorite_name = tk.StringVar()
-        self.favorite_entry = ctk.CTkEntry(row, textvariable=self.favorite_name,
-                                           placeholder_text="Dê um nome à sua cor...",
-                                           height=38, fg_color="#12161d",
-                                           border_color=self.BORDER)
-        self.favorite_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
-        self._button(row, "Salvar favorita  ＋", self._add_favorite, "primary",
-                     width=165).pack(side="right")
         self.favorites_scroll = ctk.CTkScrollableFrame(page, fg_color="transparent",
                                                        corner_radius=0)
-        self.favorites_scroll.grid(row=1, column=0, sticky="nsew")
+        self.favorites_scroll.grid(row=0, column=0, sticky="nsew")
         for column in (0, 1, 2):
             self.favorites_scroll.grid_columnconfigure(column, weight=1, uniform="fav")
         self.favorite_count = self._label(page, "0 cores salvas", 9, self.MUTED)
-        self.favorite_count.grid(row=2, column=0, sticky="w", pady=(8, 0))
+        self.favorite_count.grid(row=1, column=0, sticky="w", pady=(8, 0))
 
     def _render_native_cards(self):
         if not hasattr(self, "native_scroll"):
@@ -421,10 +408,22 @@ class NTSLCoresApp(ctk.CTk):
         for child in self.favorites_scroll.winfo_children():
             child.destroy()
         if not self.favorites:
-            empty = self._card(self.favorites_scroll)
-            empty.grid(row=0, column=0, columnspan=3, sticky="ew", padx=5, pady=5)
-            self._label(empty, "Sua paleta ainda está vazia", 16, "#ffffff", "bold").pack(pady=(14, 5))
-            self._label(empty, "Escolha uma cor no Seletor RGB e salve aqui para reutilizá-la.", 10, self.MUTED).pack(pady=(0, 14))
+            sample = {"name": "Azul-claro (exemplo)", "r": 135, "g": 206, "b": 235}
+            color = self._hex(sample["r"], sample["g"], sample["b"])
+            card = ctk.CTkFrame(self.favorites_scroll, fg_color=self.PANEL,
+                                corner_radius=13, border_width=1, border_color=self.BORDER)
+            card.grid(row=0, column=0, sticky="ew", padx=5, pady=5)
+            swatch = ctk.CTkFrame(card, height=65, corner_radius=9, fg_color=color)
+            swatch.pack(fill="x", padx=10, pady=(10, 8))
+            ctk.CTkLabel(card, text=sample["name"], text_color="#f0f3f9",
+                         font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=11)
+            ctk.CTkLabel(card, text="RGB 135, 206, 235  ·  #87CEEB  ·  demonstração",
+                         text_color=self.MUTED, font=("Cascadia Code", 8)).pack(
+                             anchor="w", padx=11, pady=(3, 12))
+            self._label(self.favorites_scroll,
+                        "Esta é apenas uma cor de exemplo. Adicione cores pelo botão no Seletor RGB.",
+                        10, self.MUTED).grid(row=1, column=0, columnspan=3,
+                                             sticky="w", padx=7, pady=(8, 4))
         for index, item in enumerate(self.favorites):
             color = self._hex(item["r"], item["g"], item["b"])
             card = ctk.CTkFrame(self.favorites_scroll, fg_color=self.PANEL,
@@ -519,12 +518,14 @@ class NTSLCoresApp(ctk.CTk):
             self._refresh_rgb()
 
     def _quick_save_favorite(self):
-        self.show_page("favorites")
-        self.favorite_entry.focus_set()
-        self.status.configure(text="●  Dê um nome à cor e clique em Salvar favorita.")
-
-    def _add_favorite(self):
-        name = self.favorite_name.get().strip()
+        dialog = ctk.CTkInputDialog(
+            text="Escolha um nome para a nova cor:",
+            title="Adicionar às favoritas"
+        )
+        name = dialog.get_input()
+        if name is None:
+            return
+        name = name.strip()
         if not name:
             messagebox.showwarning("Nome necessário", "Digite um nome para esta cor.", parent=self)
             return
@@ -538,8 +539,8 @@ class NTSLCoresApp(ctk.CTk):
             self.favorites[existing] = item
             self.selected_favorite = existing
         if self._save_favorites():
-            self.favorite_name.set("")
             self._render_favorites()
+            self.show_page("favorites")
             self.status.configure(text=f'●  Favorita "{name}" salva.')
 
     def _apply_favorite(self, index):
