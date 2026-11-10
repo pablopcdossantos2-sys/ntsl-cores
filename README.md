@@ -2,6 +2,10 @@
 
 Aplicativo desktop para escolher cores RGB, consultar constantes nativas da linguagem NTSL e manter uma paleta pessoal de cores favoritas. Gera trechos de código prontos para colar em indicadores.
 
+## Interface
+
+A interface utiliza tema escuro, navegação por abas, painéis de edição, cartões de seleção e uma área fixa para visualizar o código NTSL gerado. O layout foi reorganizado para destacar a cor selecionada, facilitar o acesso às ferramentas e separar visualmente as áreas de trabalho.
+
 ## Recursos
 
 - **Seletor RGB**: escolha por diálogo de cores ou ajuste dos canais vermelho, verde e azul (0–255).
@@ -28,7 +32,7 @@ Na aba **Favoritas**:
 1. Selecione ou ajuste a cor desejada na aba **Seletor RGB**.
 2. Volte à aba **Favoritas**, digite um nome e clique em **Salvar cor atual**.
 3. Selecione uma cor salva e clique em **Aplicar cor selecionada** para carregá-la no seletor RGB.
-4. Use **Excluir selecionada** para removê-la da paleta.
+4. Use **Excluir** para removê-la da paleta.
 
 As favoritas são armazenadas em JSON no perfil local do usuário:
 - Windows: `%APPDATA%\\NTSLCores\\favorites.json`
