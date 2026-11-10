@@ -1,11 +1,13 @@
 # NTSL Cores
 
-Aplicativo desktop para escolher cores RGB e consultar constantes de cores nativas da linguagem NTSL, gerando o trecho de código pronto para colar em indicadores.
+Aplicativo desktop para escolher cores RGB, consultar constantes nativas da linguagem NTSL e manter uma paleta pessoal de cores favoritas. Gera trechos de código prontos para colar em indicadores.
 
 ## Recursos
 
-- Aba **Seletor RGB**: escolha por diálogo de cores ou ajuste dos canais vermelho, verde e azul (0–255).
-- Aba **Cores nativas**: lista pesquisável das constantes documentadas no Manual NTSL, com amostra visual.
+- **Seletor RGB**: escolha por diálogo de cores ou ajuste dos canais vermelho, verde e azul (0–255).
+- **Cores nativas**: lista pesquisável das constantes documentadas no Manual NTSL, com amostras visuais.
+- **Paleta de favoritas**: salve cores RGB com nomes personalizados, aplique novamente ou exclua cores salvas.
+- **Persistência local**: as favoritas permanecem salvas ao fechar e reabrir o programa.
 - Campo para nome da variável NTSL.
 - Geração automática da declaração `integer` e da atribuição RGB ou da constante nativa.
 - Cópia do código completo para a área de transferência.
@@ -19,6 +21,20 @@ python main.py
 ```
 
 Não são necessárias dependências externas.
+
+## Paleta de cores favoritas
+
+Na aba **Favoritas**:
+1. Selecione ou ajuste a cor desejada na aba **Seletor RGB**.
+2. Volte à aba **Favoritas**, digite um nome e clique em **Salvar cor atual**.
+3. Selecione uma cor salva e clique em **Aplicar cor selecionada** para carregá-la no seletor RGB.
+4. Use **Excluir selecionada** para removê-la da paleta.
+
+As favoritas são armazenadas em JSON no perfil local do usuário:
+- Windows: `%APPDATA%\\NTSLCores\\favorites.json`
+- Outros sistemas: `~/.ntsl-cores/favorites.json`
+
+A paleta não é armazenada no executável nem sincronizada entre computadores. Para transferi-la, copie o arquivo `favorites.json` para o mesmo local no outro computador.
 
 ## Exemplo de código RGB
 
