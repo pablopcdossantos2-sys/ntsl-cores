@@ -265,7 +265,8 @@ class NTSLCoresApp(ctk.CTk):
 
     def _build_rgb_page(self):
         page = self._page_frame("rgb")
-        page.grid_columnconfigure((0, 1), weight=1, uniform="rgb")
+        for column in (0, 1):
+            page.grid_columnconfigure(column, weight=1, uniform="rgb")
         page.grid_rowconfigure(0, weight=1)
         preview = self._card(page)
         preview.grid(row=0, column=0, sticky="nsew", padx=(0, 9), pady=(0, 12))
@@ -329,7 +330,8 @@ class NTSLCoresApp(ctk.CTk):
         self.native_scroll = ctk.CTkScrollableFrame(page, fg_color="transparent",
                                                     corner_radius=0)
         self.native_scroll.grid(row=1, column=0, sticky="nsew")
-        self.native_scroll.grid_columnconfigure((0, 1, 2), weight=1, uniform="native")
+        for column in (0, 1, 2):
+            self.native_scroll.grid_columnconfigure(column, weight=1, uniform="native")
         self.native_selected_label = self._label(page, "Selecionada: clVermelho", 10, self.MUTED)
         self.native_selected_label.grid(row=2, column=0, sticky="w", pady=(9, 0))
 
@@ -353,7 +355,8 @@ class NTSLCoresApp(ctk.CTk):
         self.favorites_scroll = ctk.CTkScrollableFrame(page, fg_color="transparent",
                                                        corner_radius=0)
         self.favorites_scroll.grid(row=1, column=0, sticky="nsew")
-        self.favorites_scroll.grid_columnconfigure((0, 1, 2), weight=1, uniform="fav")
+        for column in (0, 1, 2):
+            self.favorites_scroll.grid_columnconfigure(column, weight=1, uniform="fav")
         self.favorite_count = self._label(page, "0 cores salvas", 9, self.MUTED)
         self.favorite_count.grid(row=2, column=0, sticky="w", pady=(8, 0))
 
