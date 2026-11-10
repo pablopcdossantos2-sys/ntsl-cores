@@ -18,13 +18,14 @@ A interface utiliza tema escuro, navegação por abas, painéis de edição, car
 
 ## Executar pelo Python
 
-Requisitos: Python 3.9+ com Tkinter.
+Requisitos: Python 3.9+.
 
 ```bash
+python -m pip install -r requirements.txt
 python main.py
 ```
 
-Não são necessárias dependências externas.
+A interface utiliza CustomTkinter e Pillow para oferecer componentes visuais modernos.
 
 ## Paleta de cores favoritas
 
@@ -68,19 +69,6 @@ end;
 ```
 
 O aplicativo também apresenta identificadores encontrados em exemplos do manual (como `clRed`, `clGreen` e `clWhite`) em uma seção separada da relação principal da seção 4.7.
-
-## Executável portátil para Windows
-
-O GitHub Actions compila o programa em um executável Windows de arquivo único, sem janela de terminal, usando PyInstaller. O executável não exige que o usuário instale Python.
-
-Para publicar uma versão:
-1. Abra a aba **Actions** do repositório.
-2. Selecione **Build and publish Windows release**.
-3. Clique em **Run workflow**.
-4. Informe a versão, por exemplo `v1.0.0`.
-5. Após a conclusão, abra **Releases** e baixe `NTSL-Cores.exe`.
-
-Também é possível disparar a publicação criando e enviando uma tag no formato `v*`.
 
 ## Fonte das constantes
 
