@@ -33,8 +33,11 @@ jobs:
       - name: Install application dependencies
         run: python -m pip install -r requirements.txt pyinstaller
 
+      - name: Generate application icon
+        run: python scripts/generate_icon.py
+
       - name: Build portable executable
-        run: pyinstaller --noconfirm --clean --onefile --windowed --name NTSL-Cores main.py
+        run: pyinstaller --noconfirm --clean --onefile --windowed --name NTSL-Cores --icon assets/NTSL-Cores.ico --add-data "assets/NTSL-Cores.ico;assets" main.py
 
       - name: Create release
         uses: softprops/action-gh-release@v2
