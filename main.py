@@ -1,13 +1,17 @@
 """
-NTSL Cores - seletor RGB, cores nativas e paleta de favoritas.
-Requer Python 3.9+ e Tkinter. Não utiliza dependências externas.
+NTSL Cores — editor visual de cores para indicadores NTSL.
+Dependências: customtkinter e Pillow. Python 3.9+
 """
 import json
 import os
 import re
 import tkinter as tk
 from pathlib import Path
-from tkinter import colorchooser, messagebox, ttk
+from tkinter import colorchooser, messagebox
+
+import customtkinter as ctk
+from PIL import Image, ImageDraw
+
 
 NATIVE_COLORS = [
     ("clAqua", "Azul-claro", "#00ffff"),
@@ -34,494 +38,393 @@ NATIVE_COLORS = [
     ("clAmarelo", "Amarelo", "#ffff00"),
 ]
 EXAMPLE_COLORS = [
-    ("clRed", "Vermelho (exemplo do manual)", "#ff0000"),
-    ("clGreen", "Verde (exemplo do manual)", "#008000"),
-    ("clWhite", "Branco (exemplo do manual)", "#ffffff"),
-    ("clYellow", "Amarelo (exemplo do manual)", "#ffff00"),
+    ("clRed", "Vermelho (exemplo)", "#ff0000"),
+    ("clGreen", "Verde (exemplo)", "#008000"),
+    ("clWhite", "Branco (exemplo)", "#ffffff"),
+    ("clYellow", "Amarelo (exemplo)", "#ffff00"),
 ]
+
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
 
 
 def favorites_file():
-    """Retorna um caminho gravável e persistente para a paleta do usuário."""
     base = os.environ.get("APPDATA")
     folder = Path(base) / "NTSLCores" if base else Path.home() / ".ntsl-cores"
     return folder / "favorites.json"
 
 
-class NTSLCoresApp:
-    BG = "#202124"
-    PANEL = "#292a2d"
-    FIELD = "#303236"
-    FG = "#f1f3f4"
-    MUTED = "#b9bbbe"
+class NTSLCoresApp(ctk.CTk):
+    BG = "#111318"
+    SIDEBAR = "#171a21"
+    PANEL = "#1b1f28"
+    PANEL_ALT = "#222733"
+    BORDER = "#2b3240"
+    TEXT = "#f3f5f9"
+    MUTED = "#929bad"
+    BLUE = "#5b8cff"
+    GREEN = "#31b987"
 
-    def __init__(self, root):
-        self.root = root
-        root.title("NTSL Cores")
-        root.geometry("760x790")
-        root.minsize(650, 700)
-        root.configure(bg=self.BG)
+    def __init__(self):
+        super().__init__()
+        self.title("NTSL Cores")
+        self.geometry("1160x820")
+        self.minsize(980, 720)
+        self.configure(fg_color=self.BG)
 
         self.variable_name = tk.StringVar(value="cor")
         self.rgb = {"r": 115, "g": 65, "b": 30}
         self.rgb_vars = {k: tk.IntVar(value=v) for k, v in self.rgb.items()}
+        self.rgb_entries = {}
+        self.rgb_sliders = {}
         self.selected_native = NATIVE_COLORS[16]
         self.mode = "rgb"
         self._syncing = False
+        self.selected_favorite = None
+        self.search_var = tk.StringVar()
         self.favorites_path = favorites_file()
         self.favorites = self._load_favorites()
+        self.nav_buttons = {}
+        self.pages = {}
 
-        self._build()
+        self._build_shell()
+        self._build_rgb_page()
+        self._build_native_page()
+        self._build_favorites_page()
+        self.show_page("rgb")
         self._refresh_rgb()
-        self._refresh_native_code()
-        self._populate_favorites()
+        self._render_native_cards()
+        self._render_favorites()
 
     def _load_favorites(self):
         try:
-            with self.favorites_path.open("r", encoding="utf-8") as file:
-                data = json.load(file)
-            if not isinstance(data, list):
-                return []
-            valid = []
-            for item in data:
-                if not isinstance(item, dict):
-                    continue
-                name = str(item.get("name", "")).strip()
+            with self.favorites_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+            result = []
+            for item in data if isinstance(data, list) else []:
                 try:
+                    name = str(item["name"]).strip()
                     r, g, b = (int(item[k]) for k in ("r", "g", "b"))
+                    if name and all(0 <= v <= 255 for v in (r, g, b)):
+                        result.append({"name": name, "r": r, "g": g, "b": b})
                 except (KeyError, TypeError, ValueError):
-                    continue
-                if name and all(0 <= v <= 255 for v in (r, g, b)):
-                    valid.append({"name": name, "r": r, "g": g, "b": b})
-            return valid
+                    pass
+            return result
         except (OSError, json.JSONDecodeError):
             return []
 
     def _save_favorites(self):
         try:
             self.favorites_path.parent.mkdir(parents=True, exist_ok=True)
-            temp_path = self.favorites_path.with_suffix(".tmp")
-            with temp_path.open("w", encoding="utf-8") as file:
-                json.dump(self.favorites, file, ensure_ascii=False, indent=2)
-            temp_path.replace(self.favorites_path)
+            temp = self.favorites_path.with_suffix(".tmp")
+            with temp.open("w", encoding="utf-8") as f:
+                json.dump(self.favorites, f, ensure_ascii=False, indent=2)
+            temp.replace(self.favorites_path)
             return True
         except OSError as exc:
-            messagebox.showerror(
-                "Não foi possível salvar",
-                f"A paleta não pôde ser gravada no computador.\n\n{exc}",
-                parent=self.root,
-            )
+            messagebox.showerror("Erro ao salvar", f"Não foi possível salvar a paleta.\n\n{exc}", parent=self)
             return False
-
-    def _setup_styles(self):
-        style = ttk.Style(self.root)
-        style.theme_use("clam")
-        style.configure("TNotebook", background=self.BG, borderwidth=0, tabmargins=(0, 0, 0, 0))
-        style.configure("TNotebook.Tab", background="#25282d", foreground="#aeb6c2",
-                        padding=(20, 12), font=("Segoe UI", 10, "bold"), borderwidth=0)
-        style.map("TNotebook.Tab", background=[("selected", "#343a43")],
-                  foreground=[("selected", "#ffffff")])
-        style.configure("TScrollbar", background="#343a43", troughcolor=self.BG,
-                        bordercolor=self.BG, arrowcolor="#aeb6c2")
-        style.configure("TScale", background=self.PANEL)
-        style.configure("TButton", font=("Segoe UI", 9, "bold"), padding=(12, 8))
-        style.configure("Accent.TButton", background="#4f8cff", foreground="#ffffff",
-                        borderwidth=0, padding=(14, 9))
-        style.map("Accent.TButton", background=[("active", "#3977e8")])
-        style.configure("Success.TButton", background="#1f9d70", foreground="#ffffff",
-                        borderwidth=0, padding=(14, 9))
-        style.map("Success.TButton", background=[("active", "#17845d")])
-        style.configure("Danger.TButton", background="#8f3d49", foreground="#ffffff",
-                        borderwidth=0, padding=(12, 8))
-        style.map("Danger.TButton", background=[("active", "#a44855")])
-
-    def _card(self, parent, padding=16):
-        return tk.Frame(parent, bg=self.PANEL, padx=padding, pady=padding,
-                        highlightthickness=1, highlightbackground="#353a42",
-                        highlightcolor="#353a42")
-
-    def _section_title(self, parent, title, subtitle=None):
-        tk.Label(parent, text=title, bg=self.PANEL, fg=self.FG,
-                 font=("Segoe UI", 12, "bold")).pack(anchor="w")
-        if subtitle:
-            tk.Label(parent, text=subtitle, bg=self.PANEL, fg=self.MUTED,
-                     font=("Segoe UI", 9), wraplength=650,
-                     justify="left").pack(anchor="w", pady=(4, 0))
-
-    def _build(self):
-        self._setup_styles()
-        self.root.title("NTSL Cores")
-        self.root.geometry("900x860")
-        self.root.minsize(760, 760)
-        self.root.configure(bg=self.BG)
-
-        # Cabeçalho
-        header = tk.Frame(self.root, bg="#171a20", padx=26, pady=18,
-                          highlightthickness=0)
-        header.pack(fill="x")
-        brand = tk.Frame(header, bg="#171a20")
-        brand.pack(side="left", fill="x", expand=True)
-        mark = tk.Canvas(brand, width=42, height=42, bg="#171a20",
-                         highlightthickness=0)
-        mark.pack(side="left", padx=(0, 12))
-        mark.create_oval(3, 3, 39, 39, fill="#4f8cff", outline="")
-        mark.create_oval(11, 11, 31, 31, fill="#171a20", outline="")
-        mark.create_oval(17, 17, 25, 25, fill="#4f8cff", outline="")
-        title_box = tk.Frame(brand, bg="#171a20")
-        title_box.pack(side="left", anchor="center")
-        tk.Label(title_box, text="NTSL Cores", bg="#171a20", fg="#ffffff",
-                 font=("Segoe UI", 19, "bold")).pack(anchor="w")
-        tk.Label(title_box, text="UTILITÁRIO DE CORES PARA INDICADORES",
-                 bg="#171a20", fg="#8d99aa",
-                 font=("Segoe UI", 8, "bold")).pack(anchor="w", pady=(2, 0))
-        tk.Label(header, text="RGB  •  NATIVAS  •  FAVORITAS",
-                 bg="#252b35", fg="#b9c9e2", padx=12, pady=8,
-                 font=("Segoe UI", 8, "bold")).pack(side="right")
-
-        body = tk.Frame(self.root, bg=self.BG, padx=24, pady=20)
-        body.pack(fill="both", expand=True)
-
-        # Identificador da variável
-        variable_card = self._card(body, 14)
-        variable_card.pack(fill="x", pady=(0, 14))
-        row = tk.Frame(variable_card, bg=self.PANEL)
-        row.pack(fill="x")
-        label_box = tk.Frame(row, bg=self.PANEL)
-        label_box.pack(side="left", fill="x", expand=True)
-        tk.Label(label_box, text="VARIÁVEL DE DESTINO", bg=self.PANEL, fg="#8f9aaa",
-                 font=("Segoe UI", 8, "bold")).pack(anchor="w")
-        tk.Label(label_box, text="Nome usado no código do indicador",
-                 bg=self.PANEL, fg=self.MUTED, font=("Segoe UI", 9)).pack(anchor="w", pady=(3, 0))
-        self.variable_name = tk.StringVar(value="cor")
-        entry = tk.Entry(row, textvariable=self.variable_name, bg="#20242b", fg="#ffffff",
-                         insertbackground="#ffffff", selectbackground="#416fb8",
-                         relief="flat", font=("Consolas", 12), width=24,
-                         highlightthickness=1, highlightbackground="#414956",
-                         highlightcolor="#4f8cff")
-        entry.pack(side="right", ipady=9, ipadx=10)
-        self.variable_name.trace_add("write", self._on_name_change)
-
-        # Navegação principal
-        self.tabs = ttk.Notebook(body)
-        self.tabs.pack(fill="both", expand=True)
-        self.rgb_tab = tk.Frame(self.tabs, bg=self.BG, padx=4, pady=16)
-        self.native_tab = tk.Frame(self.tabs, bg=self.BG, padx=4, pady=16)
-        self.favorites_tab = tk.Frame(self.tabs, bg=self.BG, padx=4, pady=16)
-        self.tabs.add(self.rgb_tab, text="  ◉  Seletor RGB  ")
-        self.tabs.add(self.native_tab, text="  ◈  Cores nativas  ")
-        self.tabs.add(self.favorites_tab, text="  ★  Favoritas  ")
-        self.tabs.bind("<<NotebookTabChanged>>", self._on_tab_changed)
-        self._build_rgb_tab()
-        self._build_native_tab()
-        self._build_favorites_tab()
-
-        # Painel fixo do código gerado
-        result = tk.Frame(body, bg="#171a20", padx=16, pady=13,
-                          highlightthickness=1, highlightbackground="#353d49")
-        result.pack(fill="x", pady=(14, 0))
-        result_head = tk.Frame(result, bg="#171a20")
-        result_head.pack(fill="x", pady=(0, 9))
-        tk.Label(result_head, text="CÓDIGO NTSL", bg="#171a20", fg="#ffffff",
-                 font=("Segoe UI", 10, "bold")).pack(side="left")
-        tk.Label(result_head, text="PRONTO PARA COPIAR", bg="#202b39", fg="#8db9ff",
-                 padx=9, pady=4, font=("Segoe UI", 7, "bold")).pack(side="right")
-        self.code = tk.Text(result, height=7, bg="#101318", fg="#c9ddff",
-                            insertbackground="#ffffff", relief="flat",
-                            font=("Cascadia Code", 10), padx=13, pady=11,
-                            wrap="none", borderwidth=0,
-                            highlightthickness=1, highlightbackground="#303946")
-        self.code.pack(fill="x")
-        bottom = tk.Frame(body, bg=self.BG)
-        bottom.pack(fill="x", pady=(10, 0))
-        self.status = tk.Label(bottom, text="●  Pronto para copiar para o indicador.",
-                               bg=self.BG, fg="#8f9aaa", font=("Segoe UI", 8))
-        self.status.pack(side="left")
-        ttk.Button(bottom, text="Copiar código NTSL  ↗", command=self._copy_code,
-                   style="Success.TButton").pack(side="right")
-
-    def _build_rgb_tab(self):
-        tab = self.rgb_tab
-        preview_card = self._card(tab, 18)
-        preview_card.pack(fill="x", pady=(0, 12))
-        self._section_title(preview_card, "Cor selecionada",
-                            "Ajuste os canais RGB ou abra o seletor visual do sistema.")
-        preview_row = tk.Frame(preview_card, bg=self.PANEL)
-        preview_row.pack(fill="x", pady=(16, 2))
-        self.rgb_preview = tk.Canvas(preview_row, width=150, height=104,
-                                     highlightthickness=1, highlightbackground="#515966",
-                                     bg="#73411e")
-        self.rgb_preview.pack(side="left")
-        self.rgb_swatch = self.rgb_preview.create_rectangle(
-            0, 0, 150, 104, fill="#73411e", outline="")
-        info = tk.Frame(preview_row, bg=self.PANEL)
-        info.pack(side="left", fill="both", expand=True, padx=18)
-        tk.Label(info, text="VALORES DA COR", bg=self.PANEL, fg="#8f9aaa",
-                 font=("Segoe UI", 8, "bold")).pack(anchor="w")
-        self.rgb_values_label = tk.Label(info, text="", bg=self.PANEL, fg="#ffffff",
-                                         font=("Consolas", 16, "bold"))
-        self.rgb_values_label.pack(anchor="w", pady=(7, 3))
-        self.hex_label = tk.Label(info, text="", bg=self.PANEL, fg="#aab6c7",
-                                  font=("Consolas", 10))
-        self.hex_label.pack(anchor="w")
-        ttk.Button(info, text="Abrir seletor de cores", command=self._choose_color,
-                   style="Accent.TButton").pack(anchor="w", pady=(14, 0))
-
-        controls = self._card(tab, 18)
-        controls.pack(fill="both", expand=True)
-        self._section_title(controls, "Ajuste fino", "Cada canal aceita valores inteiros de 0 a 255.")
-        self.scale_labels = {}
-        for key, label, accent in [("r", "VERMELHO", "#ef6464"),
-                                   ("g", "VERDE", "#4ac58a"),
-                                   ("b", "AZUL", "#5798f5")]:
-            line = tk.Frame(controls, bg=self.PANEL)
-            line.pack(fill="x", pady=(15, 3))
-            tk.Label(line, text=label, width=12, anchor="w", bg=self.PANEL,
-                     fg="#b5c0cf", font=("Segoe UI", 8, "bold")).pack(side="left")
-            tk.Scale(line, from_=0, to=255, orient="horizontal",
-                     variable=self.rgb_vars[key], command=self._on_rgb_change,
-                     showvalue=False, resolution=1, bg=self.PANEL, fg=self.FG,
-                     troughcolor="#424a56", activebackground=accent,
-                     highlightthickness=0, bd=0, sliderlength=22,
-                     relief="flat").pack(side="left", fill="x", expand=True, padx=12)
-            val = tk.Label(line, text="0", width=4, bg="#20242b", fg="#ffffff",
-                           padx=5, pady=4, font=("Consolas", 11, "bold"))
-            val.pack(side="right")
-            self.scale_labels[key] = val
-
-    def _build_native_tab(self):
-        tab = self.native_tab
-        card = self._card(tab, 18)
-        card.pack(fill="both", expand=True)
-        self._section_title(card, "Biblioteca de cores nativas",
-                            "Selecione uma constante para gerar a atribuição correspondente no código NTSL.")
-        search_row = tk.Frame(card, bg=self.PANEL)
-        search_row.pack(fill="x", pady=(16, 12))
-        tk.Label(search_row, text="⌕", bg=self.PANEL, fg="#8fa0b5",
-                 font=("Segoe UI", 16)).pack(side="left", padx=(0, 8))
-        self.search_var = tk.StringVar()
-        self.search_var.trace_add("write", lambda *_: self._populate_native_list())
-        search = tk.Entry(search_row, textvariable=self.search_var, bg="#20242b", fg="#ffffff",
-                          insertbackground="#ffffff", relief="flat",
-                          font=("Segoe UI", 10), highlightthickness=1,
-                          highlightbackground="#414956", highlightcolor="#4f8cff")
-        search.pack(side="left", fill="x", expand=True, ipady=8, padx=(0, 8))
-        tk.Label(card, text="CONSTANTE                         NOME DA COR",
-                 bg=self.PANEL, fg="#7f8b9c", font=("Segoe UI", 8, "bold")
-                 ).pack(anchor="w", pady=(0, 6))
-        list_frame = tk.Frame(card, bg="#20242b", highlightthickness=1,
-                              highlightbackground="#414956")
-        list_frame.pack(fill="both", expand=True)
-        self.native_list = tk.Listbox(list_frame, bg="#20242b", fg="#e5eaf1",
-                                      selectbackground="#294a75", selectforeground="#ffffff",
-                                      font=("Consolas", 10), activestyle="none",
-                                      relief="flat", height=11, exportselection=False,
-                                      borderwidth=0, highlightthickness=0,
-                                      selectborderwidth=0)
-        scroll = ttk.Scrollbar(list_frame, orient="vertical", command=self.native_list.yview)
-        self.native_list.configure(yscrollcommand=scroll.set)
-        self.native_list.pack(side="left", fill="both", expand=True, padx=8, pady=7)
-        scroll.pack(side="right", fill="y")
-        self.native_list.bind("<<ListboxSelect>>", self._select_native)
-        selected = tk.Frame(card, bg="#20242b", padx=12, pady=10)
-        selected.pack(fill="x", pady=(12, 0))
-        self.native_preview = tk.Canvas(selected, width=48, height=38, bg="#ff0000",
-                                        highlightthickness=0)
-        self.native_preview.pack(side="left")
-        self.native_preview_rect = self.native_preview.create_rectangle(
-            0, 0, 48, 38, fill="#ff0000", outline="")
-        self.native_description = tk.Label(selected, text="", bg="#20242b", fg="#dce5f2",
-                                           font=("Segoe UI", 10, "bold"))
-        self.native_description.pack(side="left", padx=12)
-        self._populate_native_list()
-
-    def _build_favorites_tab(self):
-        tab = self.favorites_tab
-        card = self._card(tab, 18)
-        card.pack(fill="both", expand=True)
-        self._section_title(card, "Sua paleta pessoal",
-                            "Guarde cores usadas com frequência e reutilize-as em diferentes indicadores.")
-        save_row = tk.Frame(card, bg=self.PANEL)
-        save_row.pack(fill="x", pady=(16, 12))
-        self.favorite_name = tk.StringVar()
-        entry = tk.Entry(save_row, textvariable=self.favorite_name, bg="#20242b",
-                         fg="#ffffff", insertbackground="#ffffff", relief="flat",
-                         font=("Segoe UI", 10), highlightthickness=1,
-                         highlightbackground="#414956", highlightcolor="#4f8cff")
-        entry.pack(side="left", fill="x", expand=True, ipady=9, padx=(0, 10))
-        entry.insert(0, "")
-        ttk.Button(save_row, text="＋  Salvar cor atual", command=self._add_favorite,
-                   style="Accent.TButton").pack(side="right")
-
-        tk.Label(card, text="CORES SALVAS", bg=self.PANEL, fg="#7f8b9c",
-                 font=("Segoe UI", 8, "bold")).pack(anchor="w", pady=(3, 7))
-        list_frame = tk.Frame(card, bg="#20242b", highlightthickness=1,
-                              highlightbackground="#414956")
-        list_frame.pack(fill="both", expand=True)
-        self.favorites_list = tk.Listbox(
-            list_frame, bg="#20242b", fg="#e5eaf1", selectbackground="#294a75",
-            selectforeground="#ffffff", font=("Consolas", 10), activestyle="none",
-            relief="flat", height=9, exportselection=False, borderwidth=0,
-            highlightthickness=0, selectborderwidth=0
-        )
-        fav_scroll = ttk.Scrollbar(list_frame, orient="vertical",
-                                   command=self.favorites_list.yview)
-        self.favorites_list.configure(yscrollcommand=fav_scroll.set)
-        self.favorites_list.pack(side="left", fill="both", expand=True, padx=8, pady=7)
-        fav_scroll.pack(side="right", fill="y")
-        self.favorites_list.bind("<<ListboxSelect>>", self._select_favorite)
-
-        details = tk.Frame(card, bg="#20242b", padx=12, pady=10)
-        details.pack(fill="x", pady=(12, 0))
-        self.favorite_preview = tk.Canvas(details, width=54, height=42, bg="#73411e",
-                                           highlightthickness=0)
-        self.favorite_preview.pack(side="left")
-        self.favorite_preview_rect = self.favorite_preview.create_rectangle(
-            0, 0, 54, 42, fill="#73411e", outline="")
-        self.favorite_details = tk.Label(details, text="Selecione uma cor da lista.",
-                                          bg="#20242b", fg="#c2ccda",
-                                          font=("Segoe UI", 9), justify="left")
-        self.favorite_details.pack(side="left", padx=12)
-
-        actions = tk.Frame(card, bg=self.PANEL)
-        actions.pack(fill="x", pady=(14, 0))
-        ttk.Button(actions, text="Aplicar cor selecionada", command=self._apply_favorite,
-                   style="Success.TButton").pack(side="left")
-        ttk.Button(actions, text="Excluir", command=self._delete_favorite,
-                   style="Danger.TButton").pack(side="left", padx=9)
-
-    def _populate_favorites(self, select_index=None):
-        self.favorites_list.delete(0, "end")
-        for item in self.favorites:
-            hex_color = self._hex(item["r"], item["g"], item["b"])
-            self.favorites_list.insert(
-                "end",
-                f'{item["name"]}   |   RGB({item["r"]}, {item["g"]}, {item["b"]})   |   {hex_color.upper()}'
-            )
-        if select_index is not None and 0 <= select_index < len(self.favorites):
-            self.favorites_list.selection_set(select_index)
-            self.favorites_list.activate(select_index)
-            self.favorites_list.see(select_index)
-            self._show_favorite_details(select_index)
-        elif not self.favorites:
-            self.favorite_details.configure(text="Nenhuma cor favorita salva ainda.")
-            self.favorite_preview.itemconfigure(self.favorite_preview_rect, fill=self.FIELD)
-
-    def _favorite_index(self):
-        selection = self.favorites_list.curselection()
-        return selection[0] if selection else None
-
-    def _show_favorite_details(self, index):
-        item = self.favorites[index]
-        hex_color = self._hex(item["r"], item["g"], item["b"])
-        self.favorite_preview.itemconfigure(self.favorite_preview_rect, fill=hex_color)
-        self.favorite_details.configure(
-            text=f'{item["name"]} — RGB({item["r"]}, {item["g"]}, {item["b"]}) — {hex_color.upper()}'
-        )
-
-    def _select_favorite(self, _event=None):
-        index = self._favorite_index()
-        if index is not None:
-            self._show_favorite_details(index)
-
-    def _add_favorite(self):
-        name = self.favorite_name.get().strip()
-        if not name:
-            messagebox.showwarning("Nome necessário", "Digite um nome para identificar esta cor.",
-                                   parent=self.root)
-            return
-        item = {"name": name, "r": self.rgb["r"], "g": self.rgb["g"], "b": self.rgb["b"]}
-        # Evita entradas idênticas; se o RGB já existir, atualiza seu rótulo.
-        existing = next((i for i, fav in enumerate(self.favorites)
-                         if (fav["r"], fav["g"], fav["b"]) ==
-                            (item["r"], item["g"], item["b"])), None)
-        if existing is None:
-            self.favorites.append(item)
-            index = len(self.favorites) - 1
-        else:
-            self.favorites[existing] = item
-            index = existing
-        if self._save_favorites():
-            self._populate_favorites(index)
-            self.favorite_name.set("")
-            self.status.configure(text=f'Cor favorita "{name}" salva.')
-
-    def _apply_favorite(self):
-        index = self._favorite_index()
-        if index is None:
-            messagebox.showinfo("Selecione uma cor", "Escolha uma cor favorita na lista.",
-                                parent=self.root)
-            return
-        item = self.favorites[index]
-        self._set_rgb(item["r"], item["g"], item["b"])
-        self.mode = "rgb"
-        self.tabs.select(self.rgb_tab)
-        self._refresh_rgb()
-        self.status.configure(text=f'Cor favorita "{item["name"]}" aplicada ao seletor RGB.')
-
-    def _delete_favorite(self):
-        index = self._favorite_index()
-        if index is None:
-            messagebox.showinfo("Selecione uma cor", "Escolha uma cor favorita para excluir.",
-                                parent=self.root)
-            return
-        item = self.favorites[index]
-        if not messagebox.askyesno("Confirmar exclusão",
-                                   f'Deseja excluir a cor favorita "{item["name"]}"?',
-                                   parent=self.root):
-            return
-        del self.favorites[index]
-        if self._save_favorites():
-            next_index = min(index, len(self.favorites) - 1)
-            self._populate_favorites(next_index if next_index >= 0 else None)
-            self.status.configure(text=f'Cor favorita "{item["name"]}" excluída.')
 
     @staticmethod
     def _hex(r, g, b):
-        return "#{:02x}{:02x}{:02x}".format(r, g, b)
+        return f"#{r:02x}{g:02x}{b:02x}"
 
-    def _all_native(self):
-        return NATIVE_COLORS + EXAMPLE_COLORS
+    def _card(self, parent, **kwargs):
+        return ctk.CTkFrame(parent, fg_color=self.PANEL, corner_radius=16,
+                            border_width=1, border_color=self.BORDER, **kwargs)
 
-    def _populate_native_list(self):
-        query = self.search_var.get().strip().lower()
-        self.visible_native = [c for c in self._all_native()
-                               if query in c[0].lower() or query in c[1].lower()]
-        self.native_list.delete(0, "end")
-        for name, description, _ in self.visible_native:
-            self.native_list.insert("end", f"{name:<18}  {description}")
-        selected = next((i for i, c in enumerate(self.visible_native)
-                         if c[0] == self.selected_native[0]), None)
-        if selected is not None:
-            self.native_list.selection_set(selected)
-            self.native_list.see(selected)
+    def _label(self, parent, text, size=12, color=None, weight="normal", **kwargs):
+        return ctk.CTkLabel(parent, text=text, font=("Segoe UI", size, weight),
+                            text_color=color or self.TEXT, **kwargs)
 
-    def _select_native(self, _event=None):
-        selection = self.native_list.curselection()
-        if not selection:
-            return
-        self.selected_native = self.visible_native[selection[0]]
-        name, description, color = self.selected_native
-        self.native_preview.itemconfigure(self.native_preview_rect, fill=color)
-        self.native_description.configure(text=f"{name} — {description}")
-        self._refresh_native_code()
-        if self.tabs.index("current") == 1:
-            self.mode = "native"
-            self._show_code(self._native_code())
+    def _button(self, parent, text, command, kind="primary", **kwargs):
+        styles = {
+            "primary": (self.BLUE, "#4777df", "#ffffff"),
+            "success": (self.GREEN, "#249a70", "#ffffff"),
+            "secondary": (self.PANEL_ALT, "#30394a", self.TEXT),
+            "danger": ("#713943", "#8b4652", "#ffffff"),
+        }
+        fg, hover, txt = styles[kind]
+        return ctk.CTkButton(parent, text=text, command=command, height=38,
+                             corner_radius=10, fg_color=fg, hover_color=hover,
+                             text_color=txt, font=("Segoe UI", 10, "bold"), **kwargs)
 
-    def _on_tab_changed(self, _event=None):
-        index = self.tabs.index("current")
-        if index == 0:
+    def _build_shell(self):
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+        sidebar = ctk.CTkFrame(self, width=220, corner_radius=0, fg_color=self.SIDEBAR)
+        sidebar.grid(row=0, column=0, sticky="nsew")
+        sidebar.grid_propagate(False)
+        brand = ctk.CTkFrame(sidebar, fg_color="transparent")
+        brand.pack(fill="x", padx=22, pady=(26, 34))
+        logo = ctk.CTkFrame(brand, width=42, height=42, corner_radius=13, fg_color=self.BLUE)
+        logo.pack(side="left")
+        logo.pack_propagate(False)
+        self._label(logo, "N", 23, "#ffffff", "bold").place(relx=.5, rely=.48, anchor="center")
+        brand_text = ctk.CTkFrame(brand, fg_color="transparent")
+        brand_text.pack(side="left", padx=11)
+        self._label(brand_text, "NTSL Cores", 17, "#ffffff", "bold").pack(anchor="w")
+        self._label(brand_text, "COLOR STUDIO", 8, self.MUTED, "bold").pack(anchor="w", pady=(1, 0))
+
+        self._label(sidebar, "FERRAMENTAS", 9, "#697487", "bold").pack(anchor="w", padx=23, pady=(0, 10))
+        nav_items = [
+            ("rgb", "◉", "Seletor RGB", "Escolha uma cor"),
+            ("native", "▦", "Cores nativas", "Constantes NTSL"),
+            ("favorites", "★", "Favoritas", "Sua biblioteca"),
+        ]
+        for key, icon, title, subtitle in nav_items:
+            btn = ctk.CTkButton(sidebar, text=f"{icon}   {title}", anchor="w",
+                                height=48, corner_radius=10, fg_color="transparent",
+                                hover_color="#252c39", text_color="#b9c3d2",
+                                font=("Segoe UI", 12, "bold"),
+                                command=lambda k=key: self.show_page(k))
+            btn.pack(fill="x", padx=13, pady=3)
+            self.nav_buttons[key] = btn
+
+        sidebar_bottom = ctk.CTkFrame(sidebar, fg_color="transparent")
+        sidebar_bottom.pack(side="bottom", fill="x", padx=20, pady=20)
+        ctk.CTkFrame(sidebar_bottom, height=1, fg_color=self.BORDER).pack(fill="x", pady=(0, 14))
+        self._label(sidebar_bottom, "FEITO PARA INDICADORES", 8, "#697487", "bold").pack(anchor="w")
+        self._label(sidebar_bottom, "NTSL · RGB · Cores nativas", 9, self.MUTED).pack(anchor="w", pady=(5, 0))
+
+        main = ctk.CTkFrame(self, fg_color=self.BG, corner_radius=0)
+        main.grid(row=0, column=1, sticky="nsew")
+        main.grid_rowconfigure(1, weight=1)
+        main.grid_columnconfigure(0, weight=1)
+        header = ctk.CTkFrame(main, fg_color=self.BG, corner_radius=0)
+        header.grid(row=0, column=0, sticky="ew", padx=30, pady=(23, 15))
+        header.grid_columnconfigure(0, weight=1)
+        self.page_title = self._label(header, "Seletor RGB", 23, "#ffffff", "bold")
+        self.page_title.grid(row=0, column=0, sticky="w")
+        self.page_subtitle = self._label(header, "Crie cores personalizadas para seus indicadores.", 11, self.MUTED)
+        self.page_subtitle.grid(row=1, column=0, sticky="w", pady=(4, 0))
+        variable = ctk.CTkFrame(header, fg_color=self.PANEL, corner_radius=12,
+                                border_width=1, border_color=self.BORDER)
+        variable.grid(row=0, column=1, rowspan=2, sticky="e", padx=(18, 0))
+        self._label(variable, "VARIÁVEL NTSL", 8, self.MUTED, "bold").pack(anchor="w", padx=12, pady=(7, 0))
+        self.variable_entry = ctk.CTkEntry(variable, textvariable=self.variable_name,
+                                           width=150, height=30, border_width=0,
+                                           fg_color="transparent", text_color="#ffffff",
+                                           font=("Cascadia Code", 12))
+        self.variable_entry.pack(padx=8, pady=(0, 6))
+        self.variable_name.trace_add("write", self._on_name_change)
+
+        self.content = ctk.CTkFrame(main, fg_color="transparent", corner_radius=0)
+        self.content.grid(row=1, column=0, sticky="nsew", padx=30)
+        self.content.grid_columnconfigure(0, weight=1)
+        self.content.grid_rowconfigure(0, weight=1)
+
+        code_panel = ctk.CTkFrame(main, fg_color="#171b23", corner_radius=15,
+                                  border_width=1, border_color=self.BORDER)
+        code_panel.grid(row=2, column=0, sticky="ew", padx=30, pady=(14, 20))
+        code_header = ctk.CTkFrame(code_panel, fg_color="transparent")
+        code_header.pack(fill="x", padx=16, pady=(12, 7))
+        self._label(code_header, "CÓDIGO NTSL", 10, "#e9edf5", "bold").pack(side="left")
+        self._label(code_header, "PRONTO PARA USAR", 8, "#7ea9ff", "bold").pack(side="right")
+        self.code = ctk.CTkTextbox(code_panel, height=138, corner_radius=9,
+                                   fg_color="#10141b", text_color="#c8dcff",
+                                   border_width=1, border_color="#283244",
+                                   font=("Cascadia Code", 11), wrap="none")
+        self.code.pack(fill="x", padx=13, pady=(0, 12))
+        footer = ctk.CTkFrame(main, fg_color="transparent")
+        footer.grid(row=3, column=0, sticky="ew", padx=30, pady=(0, 14))
+        self.status = self._label(footer, "●  Pronto", 9, self.MUTED)
+        self.status.pack(side="left")
+        self._button(footer, "Copiar código  ↗", self._copy_code, "success", width=170).pack(side="right")
+
+    def _page_frame(self, key):
+        page = ctk.CTkFrame(self.content, fg_color="transparent", corner_radius=0)
+        page.grid(row=0, column=0, sticky="nsew")
+        page.grid_columnconfigure(0, weight=1)
+        page.grid_rowconfigure(0, weight=1)
+        self.pages[key] = page
+        return page
+
+    def show_page(self, key):
+        for page in self.pages.values():
+            page.grid_remove()
+        if key in self.pages:
+            self.pages[key].grid()
+        for name, button in self.nav_buttons.items():
+            button.configure(fg_color="#29354a" if name == key else "transparent",
+                             text_color="#ffffff" if name == key else "#b9c3d2")
+        titles = {
+            "rgb": ("Seletor RGB", "Crie cores personalizadas para seus indicadores."),
+            "native": ("Cores nativas", "Explore as constantes de cores disponíveis na linguagem NTSL."),
+            "favorites": ("Paleta de favoritas", "Suas cores salvas, organizadas em uma biblioteca pessoal."),
+        }
+        self.page_title.configure(text=titles[key][0])
+        self.page_subtitle.configure(text=titles[key][1])
+        if key == "rgb":
             self.mode = "rgb"
-            self._show_code(self._rgb_code())
-        elif index == 1:
+            self._refresh_code()
+        elif key == "native":
             self.mode = "native"
-            self._show_code(self._native_code())
-        else:
-            # A aba Favoritas não muda a origem do código gerado.
-            self._refresh_code_for_mode()
+            self._refresh_code()
 
-    def _on_name_change(self, *_):
-        self._refresh_code_for_mode()
+    def _build_rgb_page(self):
+        page = self._page_frame("rgb")
+        page.grid_columnconfigure((0, 1), weight=1, uniform="rgb")
+        page.grid_rowconfigure(0, weight=1)
+        preview = self._card(page)
+        preview.grid(row=0, column=0, sticky="nsew", padx=(0, 9), pady=(0, 12))
+        self._label(preview, "PRÉ-VISUALIZAÇÃO", 9, self.MUTED, "bold").pack(anchor="w")
+        self.preview_swatch = ctk.CTkFrame(preview, height=190, corner_radius=15,
+                                           fg_color="#73411e")
+        self.preview_swatch.pack(fill="x", pady=(15, 16))
+        self.preview_swatch.pack_propagate(False)
+        self.preview_hex = self._label(preview, "#73411E", 24, "#ffffff", "bold")
+        self.preview_hex.pack(anchor="w")
+        self.preview_rgb = self._label(preview, "RGB  115   65   30", 11, self.MUTED)
+        self.preview_rgb.pack(anchor="w", pady=(5, 0))
+        self._button(preview, "Abrir seletor do sistema", self._choose_color,
+                     "secondary").pack(fill="x", pady=(19, 0))
+
+        controls = self._card(page)
+        controls.grid(row=0, column=1, sticky="nsew", padx=(9, 0), pady=(0, 12))
+        self._label(controls, "AJUSTE DE CANAIS", 9, self.MUTED, "bold").pack(anchor="w")
+        self._label(controls, "Defina os valores RGB", 17, "#ffffff", "bold").pack(anchor="w", pady=(7, 3))
+        self._label(controls, "Cada canal aceita números inteiros de 0 a 255.", 10, self.MUTED).pack(anchor="w", pady=(0, 18))
+        for key, label, color in [("r", "VERMELHO", "#f06b73"),
+                                  ("g", "VERDE", "#45c58a"),
+                                  ("b", "AZUL", "#5798f5")]:
+            row = ctk.CTkFrame(controls, fg_color="transparent")
+            row.pack(fill="x", pady=(8, 13))
+            top = ctk.CTkFrame(row, fg_color="transparent")
+            top.pack(fill="x")
+            ctk.CTkLabel(top, text=label, text_color="#c2cad7",
+                         font=("Segoe UI", 9, "bold")).pack(side="left")
+            entry = ctk.CTkEntry(top, width=66, height=31, justify="center",
+                                 fg_color="#12161d", border_color=self.BORDER,
+                                 text_color="#ffffff", font=("Cascadia Code", 12))
+            entry.pack(side="right")
+            entry.insert(0, str(self.rgb[key]))
+            entry.bind("<Return>", lambda e, k=key: self._entry_rgb(k))
+            entry.bind("<FocusOut>", lambda e, k=key: self._entry_rgb(k))
+            self.rgb_entries[key] = entry
+            slider = ctk.CTkSlider(row, from_=0, to=255, number_of_steps=255,
+                                   progress_color=color, button_color=color,
+                                   button_hover_color=color, height=16,
+                                   command=lambda value, k=key: self._slider_rgb(k, value))
+            slider.pack(fill="x", pady=(9, 0))
+            slider.set(self.rgb[key])
+            self.rgb_sliders[key] = slider
+        self._button(controls, "Adicionar às favoritas  ＋", self._quick_save_favorite,
+                     "primary").pack(fill="x", pady=(9, 0))
+
+    def _build_native_page(self):
+        page = self._page_frame("native")
+        page.grid_rowconfigure(1, weight=1)
+        page.grid_columnconfigure(0, weight=1)
+        search_card = self._card(page)
+        search_card.grid(row=0, column=0, sticky="ew", pady=(0, 12))
+        self._label(search_card, "ENCONTRE UMA CONSTANTE", 9, self.MUTED, "bold").pack(anchor="w")
+        self.native_search = ctk.CTkEntry(search_card, textvariable=self.search_var,
+                                          placeholder_text="Pesquisar por nome ou identificador...",
+                                          height=38, fg_color="#12161d",
+                                          border_color=self.BORDER)
+        self.native_search.pack(fill="x", pady=(9, 0))
+        self.search_var.trace_add("write", lambda *_: self._render_native_cards())
+        self.native_scroll = ctk.CTkScrollableFrame(page, fg_color="transparent",
+                                                    corner_radius=0)
+        self.native_scroll.grid(row=1, column=0, sticky="nsew")
+        self.native_scroll.grid_columnconfigure((0, 1, 2), weight=1, uniform="native")
+        self.native_selected_label = self._label(page, "Selecionada: clVermelho", 10, self.MUTED)
+        self.native_selected_label.grid(row=2, column=0, sticky="w", pady=(9, 0))
+
+    def _build_favorites_page(self):
+        page = self._page_frame("favorites")
+        page.grid_rowconfigure(1, weight=1)
+        page.grid_columnconfigure(0, weight=1)
+        add = self._card(page)
+        add.grid(row=0, column=0, sticky="ew", pady=(0, 12))
+        self._label(add, "SALVAR COR ATUAL", 9, self.MUTED, "bold").pack(anchor="w")
+        row = ctk.CTkFrame(add, fg_color="transparent")
+        row.pack(fill="x", pady=(9, 0))
+        self.favorite_name = tk.StringVar()
+        self.favorite_entry = ctk.CTkEntry(row, textvariable=self.favorite_name,
+                                           placeholder_text="Dê um nome à sua cor...",
+                                           height=38, fg_color="#12161d",
+                                           border_color=self.BORDER)
+        self.favorite_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self._button(row, "Salvar favorita  ＋", self._add_favorite, "primary",
+                     width=165).pack(side="right")
+        self.favorites_scroll = ctk.CTkScrollableFrame(page, fg_color="transparent",
+                                                       corner_radius=0)
+        self.favorites_scroll.grid(row=1, column=0, sticky="nsew")
+        self.favorites_scroll.grid_columnconfigure((0, 1, 2), weight=1, uniform="fav")
+        self.favorite_count = self._label(page, "0 cores salvas", 9, self.MUTED)
+        self.favorite_count.grid(row=2, column=0, sticky="w", pady=(8, 0))
+
+    def _render_native_cards(self):
+        if not hasattr(self, "native_scroll"):
+            return
+        for child in self.native_scroll.winfo_children():
+            child.destroy()
+        query = self.search_var.get().strip().lower()
+        colors = [c for c in NATIVE_COLORS + EXAMPLE_COLORS
+                  if query in c[0].lower() or query in c[1].lower()]
+        for index, (identifier, name, color) in enumerate(colors):
+            card = ctk.CTkFrame(self.native_scroll, fg_color=self.PANEL,
+                                corner_radius=13, border_width=1,
+                                border_color=self.BORDER)
+            card.grid(row=index // 3, column=index % 3, sticky="ew",
+                      padx=5, pady=5)
+            card.grid_columnconfigure(1, weight=1)
+            swatch = ctk.CTkFrame(card, width=43, height=43, corner_radius=10,
+                                  fg_color=color)
+            swatch.grid(row=0, column=0, rowspan=2, padx=11, pady=11)
+            swatch.grid_propagate(False)
+            ctk.CTkLabel(card, text=identifier, text_color="#f0f3f9",
+                         font=("Cascadia Code", 10, "bold")).grid(
+                             row=0, column=1, sticky="sw", padx=(0, 5), pady=(11, 0))
+            ctk.CTkLabel(card, text=name, text_color=self.MUTED,
+                         font=("Segoe UI", 9)).grid(
+                             row=1, column=1, sticky="nw", padx=(0, 5), pady=(2, 11))
+            card.bind("<Button-1>", lambda e, item=(identifier, name, color): self._choose_native(item))
+            for widget in card.winfo_children():
+                widget.bind("<Button-1>", lambda e, item=(identifier, name, color): self._choose_native(item))
+            if identifier == self.selected_native[0]:
+                card.configure(border_color=self.BLUE)
+
+    def _choose_native(self, item):
+        self.selected_native = item
+        self.mode = "native"
+        self.native_selected_label.configure(text=f"Selecionada: {item[0]}")
+        self._render_native_cards()
+        self._refresh_code()
+        self.status.configure(text=f"●  Constante {item[0]} selecionada")
+
+    def _render_favorites(self):
+        if not hasattr(self, "favorites_scroll"):
+            return
+        for child in self.favorites_scroll.winfo_children():
+            child.destroy()
+        if not self.favorites:
+            empty = self._card(self.favorites_scroll)
+            empty.grid(row=0, column=0, columnspan=3, sticky="ew", padx=5, pady=5)
+            self._label(empty, "Sua paleta ainda está vazia", 16, "#ffffff", "bold").pack(pady=(14, 5))
+            self._label(empty, "Escolha uma cor no Seletor RGB e salve aqui para reutilizá-la.", 10, self.MUTED).pack(pady=(0, 14))
+        for index, item in enumerate(self.favorites):
+            color = self._hex(item["r"], item["g"], item["b"])
+            card = ctk.CTkFrame(self.favorites_scroll, fg_color=self.PANEL,
+                                corner_radius=13, border_width=1,
+                                border_color=self.BLUE if index == self.selected_favorite else self.BORDER)
+            card.grid(row=index // 3, column=index % 3, sticky="ew", padx=5, pady=5)
+            swatch = ctk.CTkFrame(card, height=65, corner_radius=9, fg_color=color)
+            swatch.pack(fill="x", padx=10, pady=(10, 8))
+            ctk.CTkLabel(card, text=item["name"], text_color="#f0f3f9",
+                         font=("Segoe UI", 11, "bold")).pack(anchor="w", padx=11)
+            ctk.CTkLabel(card, text=f'RGB {item["r"]}, {item["g"]}, {item["b"]}  ·  {color.upper()}',
+                         text_color=self.MUTED, font=("Cascadia Code", 8)).pack(anchor="w", padx=11, pady=(3, 8))
+            actions = ctk.CTkFrame(card, fg_color="transparent")
+            actions.pack(fill="x", padx=9, pady=(0, 10))
+            self._button(actions, "Aplicar", lambda i=index: self._apply_favorite(i),
+                         "success", width=90, height=30).pack(side="left", expand=True, fill="x", padx=(0, 4))
+            self._button(actions, "Excluir", lambda i=index: self._delete_favorite(i),
+                         "danger", width=75, height=30).pack(side="left", expand=True, fill="x", padx=(4, 0))
+        self.favorite_count.configure(text=f"{len(self.favorites)} cores salvas")
 
     def _valid_name(self):
         name = self.variable_name.get().strip()
@@ -541,78 +444,119 @@ class NTSLCoresApp:
         name = self._valid_name()
         if not name:
             return "// Informe um nome de variável válido."
-        constant = self.selected_native[0]
         return (f"var\n  {name} : integer;\n\nbegin\n\n"
                 f"  // Cor {self.selected_native[1].lower()} nativa\n"
-                f"  {name} := {constant};\n\nend;")
+                f"  {name} := {self.selected_native[0]};\n\nend;")
 
-    def _show_code(self, text):
+    def _refresh_code(self):
+        text = self._rgb_code() if self.mode == "rgb" else self._native_code()
         self.code.configure(state="normal")
         self.code.delete("1.0", "end")
         self.code.insert("1.0", text)
         self.code.configure(state="disabled")
 
-    def _refresh_native_code(self):
-        self._refresh_code_for_mode()
-
-    def _refresh_code_for_mode(self):
-        self._show_code(self._rgb_code() if self.mode == "rgb" else self._native_code())
+    def _on_name_change(self, *_):
+        if hasattr(self, "code"):
+            self._refresh_code()
 
     def _refresh_rgb(self):
-        hex_color = self._rgb_hex()
-        self.rgb_preview.itemconfigure(self.rgb_swatch, fill=hex_color)
-        for k, v in self.rgb.items():
-            self.scale_labels[k].configure(text=str(v))
-        self.rgb_values_label.configure(
-            text=f"RGB({self.rgb['r']}, {self.rgb['g']}, {self.rgb['b']})")
-        self.hex_label.configure(text=f"HEX {hex_color.upper()}")
-        self._refresh_code_for_mode()
+        color = self._hex(self.rgb["r"], self.rgb["g"], self.rgb["b"])
+        self.preview_swatch.configure(fg_color=color)
+        self.preview_hex.configure(text=color.upper())
+        self.preview_rgb.configure(text=f'RGB   {self.rgb["r"]}   {self.rgb["g"]}   {self.rgb["b"]}')
+        for key in ("r", "g", "b"):
+            if key in self.rgb_entries:
+                self.rgb_entries[key].delete(0, "end")
+                self.rgb_entries[key].insert(0, str(self.rgb[key]))
+            if key in self.rgb_sliders:
+                self.rgb_sliders[key].set(self.rgb[key])
+        self._refresh_code()
 
-    def _on_rgb_change(self, _value=None):
+    def _slider_rgb(self, key, value):
         if self._syncing:
             return
-        self.rgb = {k: int(v.get()) for k, v in self.rgb_vars.items()}
+        self.rgb[key] = int(round(float(value)))
         self.mode = "rgb"
         self._refresh_rgb()
 
-    def _rgb_hex(self):
-        return self._hex(self.rgb["r"], self.rgb["g"], self.rgb["b"])
-
-    def _set_rgb(self, red, green, blue):
-        self._syncing = True
-        self.rgb = {"r": int(red), "g": int(green), "b": int(blue)}
-        for key, value in self.rgb.items():
-            self.rgb_vars[key].set(value)
-        self._syncing = False
+    def _entry_rgb(self, key):
+        try:
+            value = int(self.rgb_entries[key].get())
+            if not 0 <= value <= 255:
+                raise ValueError
+        except ValueError:
+            self.rgb_entries[key].delete(0, "end")
+            self.rgb_entries[key].insert(0, str(self.rgb[key]))
+            return
+        self.rgb[key] = value
+        self.mode = "rgb"
         self._refresh_rgb()
 
     def _choose_color(self):
-        chosen = colorchooser.askcolor(color=self._rgb_hex(), title="Selecionar cor RGB",
-                                       parent=self.root)
-        if chosen and chosen[0]:
-            values = [int(round(x)) for x in chosen[0]]
-            self._set_rgb(*values)
+        result = colorchooser.askcolor(color=self._hex(**self.rgb), title="Selecionar cor RGB", parent=self)
+        if result and result[0]:
+            self.rgb = dict(zip(("r", "g", "b"), (int(round(v)) for v in result[0])))
             self.mode = "rgb"
-            self.tabs.select(self.rgb_tab)
             self._refresh_rgb()
+
+    def _quick_save_favorite(self):
+        if not hasattr(self, "favorite_name"):
+            self.show_page("favorites")
+        self.favorite_entry.focus_set()
+        self.status.configure(text="●  Dê um nome à cor e clique em Salvar favorita.")
+
+    def _add_favorite(self):
+        name = self.favorite_name.get().strip()
+        if not name:
+            messagebox.showwarning("Nome necessário", "Digite um nome para esta cor.", parent=self)
+            return
+        item = {"name": name, **self.rgb}
+        existing = next((i for i, fav in enumerate(self.favorites)
+                         if (fav["r"], fav["g"], fav["b"]) == (item["r"], item["g"], item["b"])), None)
+        if existing is None:
+            self.favorites.append(item)
+            self.selected_favorite = len(self.favorites) - 1
+        else:
+            self.favorites[existing] = item
+            self.selected_favorite = existing
+        if self._save_favorites():
+            self.favorite_name.set("")
+            self._render_favorites()
+            self.status.configure(text=f'●  Favorita "{name}" salva.')
+
+    def _apply_favorite(self, index):
+        item = self.favorites[index]
+        self.rgb = {k: item[k] for k in ("r", "g", "b")}
+        self.mode = "rgb"
+        self.show_page("rgb")
+        self._refresh_rgb()
+        self.status.configure(text=f'●  Cor "{item["name"]}" aplicada ao seletor RGB.')
+
+    def _delete_favorite(self, index):
+        item = self.favorites[index]
+        if not messagebox.askyesno("Excluir favorita", f'Deseja excluir "{item["name"]}"?', parent=self):
+            return
+        del self.favorites[index]
+        self.selected_favorite = None
+        if self._save_favorites():
+            self._render_favorites()
+            self.status.configure(text=f'●  Cor "{item["name"]}" excluída.')
 
     def _copy_code(self):
         if not self._valid_name():
             messagebox.showwarning("Nome inválido",
-                                   "Use letras, números ou _ e não comece com número.",
-                                   parent=self.root)
+                                   "Use letras, números ou _ e não comece com número.", parent=self)
             return
         text = self.code.get("1.0", "end-1c")
-        self.root.clipboard_clear()
-        self.root.clipboard_append(text)
-        self.root.update()
-        self.status.configure(text="Código copiado para a área de transferência.")
+        self.clipboard_clear()
+        self.clipboard_append(text)
+        self.update()
+        self.status.configure(text="●  Código copiado para a área de transferência.")
 
 
 def main():
-    root = tk.Tk()
-    NTSLCoresApp(root)
-    root.mainloop()
+    app = NTSLCoresApp()
+    app.mainloop()
 
 
 if __name__ == "__main__":
