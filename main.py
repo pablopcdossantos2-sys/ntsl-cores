@@ -353,7 +353,7 @@ class NTSLCoresApp(ctk.CTk):
 
     def _build_favorites_page(self):
         page = self._page_frame("favorites")
-        page.grid_rowconfigure(1, weight=1)
+        page.grid_rowconfigure(0, weight=1)
         page.grid_columnconfigure(0, weight=1)
         self.favorites_scroll = ctk.CTkScrollableFrame(page, fg_color="transparent",
                                                        corner_radius=0)
