@@ -5,6 +5,7 @@ Dependências: customtkinter e Pillow. Python 3.9+
 import json
 import os
 import re
+import sys
 import tkinter as tk
 from pathlib import Path
 from tkinter import colorchooser, messagebox
@@ -68,9 +69,14 @@ class NTSLCoresApp(ctk.CTk):
     def __init__(self):
         super().__init__()
         self.title("NTSL Cores")
-        self.geometry("1160x820")
-        self.minsize(980, 720)
+        self.geometry("1280x900")
+        self.minsize(1080, 760)
         self.configure(fg_color=self.BG)
+        self._set_window_icon()
+        self.update_idletasks()
+        sw, sh = self.winfo_screenwidth(), self.winfo_screenheight()
+        ww, wh = min(1280, sw - 80), min(900, sh - 100)
+        self.geometry(f"{ww}x{wh}+{(sw-ww)//2}+{(sh-wh)//2}")
 
         self.variable_name = tk.StringVar(value="cor")
         self.rgb = {"r": 115, "g": 65, "b": 30}
@@ -95,6 +101,15 @@ class NTSLCoresApp(ctk.CTk):
         self._refresh_rgb()
         self._render_native_cards()
         self._render_favorites()
+
+    def _set_window_icon(self):
+        base = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
+        icon_path = base / "assets" / "NTSL-Cores.ico"
+        if icon_path.exists():
+            try:
+                self.iconbitmap(default=str(icon_path))
+            except tk.TclError:
+                pass
 
     def _load_favorites(self):
         try:
@@ -130,7 +145,7 @@ class NTSLCoresApp(ctk.CTk):
         return f"#{r:02x}{g:02x}{b:02x}"
 
     def _card(self, parent, **kwargs):
-        return ctk.CTkFrame(parent, fg_color=self.PANEL, corner_radius=16,
+        return ctk.CTkFrame(parent, fg_color=self.PANEL, corner_radius=18,
                             border_width=1, border_color=self.BORDER, **kwargs)
 
     def _label(self, parent, text, size=12, color=None, weight="normal", **kwargs):
@@ -154,11 +169,11 @@ class NTSLCoresApp(ctk.CTk):
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
 
-        sidebar = ctk.CTkFrame(self, width=220, corner_radius=0, fg_color=self.SIDEBAR)
+        sidebar = ctk.CTkFrame(self, width=252, corner_radius=0, fg_color=self.SIDEBAR)
         sidebar.grid(row=0, column=0, sticky="nsew")
         sidebar.grid_propagate(False)
         brand = ctk.CTkFrame(sidebar, fg_color="transparent")
-        brand.pack(fill="x", padx=22, pady=(26, 34))
+        brand.pack(fill="x", padx=25, pady=(32, 42))
         logo = ctk.CTkFrame(brand, width=42, height=42, corner_radius=13, fg_color=self.BLUE)
         logo.pack(side="left")
         logo.pack_propagate(False)
@@ -180,7 +195,7 @@ class NTSLCoresApp(ctk.CTk):
                                 hover_color="#252c39", text_color="#b9c3d2",
                                 font=("Segoe UI", 12, "bold"),
                                 command=lambda k=key: self.show_page(k))
-            btn.pack(fill="x", padx=13, pady=3)
+            btn.pack(fill="x", padx=17, pady=5)
             self.nav_buttons[key] = btn
 
         sidebar_bottom = ctk.CTkFrame(sidebar, fg_color="transparent")
@@ -194,7 +209,7 @@ class NTSLCoresApp(ctk.CTk):
         main.grid_rowconfigure(1, weight=1)
         main.grid_columnconfigure(0, weight=1)
         header = ctk.CTkFrame(main, fg_color=self.BG, corner_radius=0)
-        header.grid(row=0, column=0, sticky="ew", padx=30, pady=(23, 15))
+        header.grid(row=0, column=0, sticky="ew", padx=42, pady=(34, 24))
         header.grid_columnconfigure(0, weight=1)
         self.page_title = self._label(header, "Seletor RGB", 23, "#ffffff", "bold")
         self.page_title.grid(row=0, column=0, sticky="w")
@@ -212,13 +227,13 @@ class NTSLCoresApp(ctk.CTk):
         self.variable_name.trace_add("write", self._on_name_change)
 
         self.content = ctk.CTkFrame(main, fg_color="transparent", corner_radius=0)
-        self.content.grid(row=1, column=0, sticky="nsew", padx=30)
+        self.content.grid(row=1, column=0, sticky="nsew", padx=42)
         self.content.grid_columnconfigure(0, weight=1)
         self.content.grid_rowconfigure(0, weight=1)
 
         code_panel = ctk.CTkFrame(main, fg_color="#171b23", corner_radius=15,
                                   border_width=1, border_color=self.BORDER)
-        code_panel.grid(row=2, column=0, sticky="ew", padx=30, pady=(14, 20))
+        code_panel.grid(row=2, column=0, sticky="ew", padx=42, pady=(20, 24))
         code_header = ctk.CTkFrame(code_panel, fg_color="transparent")
         code_header.pack(fill="x", padx=16, pady=(12, 7))
         self._label(code_header, "CÓDIGO NTSL", 10, "#e9edf5", "bold").pack(side="left")
@@ -229,7 +244,7 @@ class NTSLCoresApp(ctk.CTk):
                                    font=("Cascadia Code", 11), wrap="none")
         self.code.pack(fill="x", padx=13, pady=(0, 12))
         footer = ctk.CTkFrame(main, fg_color="transparent")
-        footer.grid(row=3, column=0, sticky="ew", padx=30, pady=(0, 14))
+        footer.grid(row=3, column=0, sticky="ew", padx=42, pady=(0, 20))
         self.status = self._label(footer, "●  Pronto", 9, self.MUTED)
         self.status.pack(side="left")
         self._button(footer, "Copiar código  ↗", self._copy_code, "success", width=170).pack(side="right")
@@ -271,28 +286,28 @@ class NTSLCoresApp(ctk.CTk):
         page.grid_rowconfigure(0, weight=1)
         preview = self._card(page)
         preview.grid(row=0, column=0, sticky="nsew", padx=(0, 9), pady=(0, 12))
-        self._label(preview, "PRÉ-VISUALIZAÇÃO", 9, self.MUTED, "bold").pack(anchor="w")
+        self._label(preview, "PRÉ-VISUALIZAÇÃO", 9, self.MUTED, "bold").pack(anchor="w", padx=22, pady=(22, 0))
         self.preview_swatch = ctk.CTkFrame(preview, height=190, corner_radius=15,
                                            fg_color="#73411e")
-        self.preview_swatch.pack(fill="x", pady=(15, 16))
+        self.preview_swatch.pack(fill="x", padx=22, pady=(18, 20))
         self.preview_swatch.pack_propagate(False)
         self.preview_hex = self._label(preview, "#73411E", 24, "#ffffff", "bold")
-        self.preview_hex.pack(anchor="w")
+        self.preview_hex.pack(anchor="w", padx=22)
         self.preview_rgb = self._label(preview, "RGB  115   65   30", 11, self.MUTED)
-        self.preview_rgb.pack(anchor="w", pady=(5, 0))
+        self.preview_rgb.pack(anchor="w", padx=22, pady=(7, 0))
         self._button(preview, "Abrir seletor do sistema", self._choose_color,
-                     "secondary").pack(fill="x", pady=(19, 0))
+                     "secondary").pack(fill="x", padx=22, pady=(22, 22))
 
         controls = self._card(page)
         controls.grid(row=0, column=1, sticky="nsew", padx=(9, 0), pady=(0, 12))
-        self._label(controls, "AJUSTE DE CANAIS", 9, self.MUTED, "bold").pack(anchor="w")
-        self._label(controls, "Defina os valores RGB", 17, "#ffffff", "bold").pack(anchor="w", pady=(7, 3))
-        self._label(controls, "Cada canal aceita números inteiros de 0 a 255.", 10, self.MUTED).pack(anchor="w", pady=(0, 18))
+        self._label(controls, "AJUSTE DE CANAIS", 9, self.MUTED, "bold").pack(anchor="w", padx=22, pady=(22, 0))
+        self._label(controls, "Defina os valores RGB", 17, "#ffffff", "bold").pack(anchor="w", padx=22, pady=(10, 3))
+        self._label(controls, "Cada canal aceita números inteiros de 0 a 255.", 10, self.MUTED).pack(anchor="w", padx=22, pady=(0, 20))
         for key, label, color in [("r", "VERMELHO", "#f06b73"),
                                   ("g", "VERDE", "#45c58a"),
                                   ("b", "AZUL", "#5798f5")]:
             row = ctk.CTkFrame(controls, fg_color="transparent")
-            row.pack(fill="x", pady=(8, 13))
+            row.pack(fill="x", padx=22, pady=(9, 14))
             top = ctk.CTkFrame(row, fg_color="transparent")
             top.pack(fill="x")
             ctk.CTkLabel(top, text=label, text_color="#c2cad7",
@@ -313,7 +328,7 @@ class NTSLCoresApp(ctk.CTk):
             slider.set(self.rgb[key])
             self.rgb_sliders[key] = slider
         self._button(controls, "Adicionar às favoritas  ＋", self._quick_save_favorite,
-                     "primary").pack(fill="x", pady=(9, 0))
+                     "primary").pack(fill="x", padx=22, pady=(10, 22))
 
     def _build_native_page(self):
         page = self._page_frame("native")
@@ -374,7 +389,7 @@ class NTSLCoresApp(ctk.CTk):
                                 corner_radius=13, border_width=1,
                                 border_color=self.BORDER)
             card.grid(row=index // 3, column=index % 3, sticky="ew",
-                      padx=5, pady=5)
+                      padx=8, pady=8)
             card.grid_columnconfigure(1, weight=1)
             swatch = ctk.CTkFrame(card, width=43, height=43, corner_radius=10,
                                   fg_color=color)
