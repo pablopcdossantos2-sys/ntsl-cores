@@ -145,7 +145,8 @@ class NTSLCoresApp(ctk.CTk):
             "danger": ("#713943", "#8b4652", "#ffffff"),
         }
         fg, hover, txt = styles[kind]
-        return ctk.CTkButton(parent, text=text, command=command, height=38,
+        height = kwargs.pop("height", 38)
+        return ctk.CTkButton(parent, text=text, command=command, height=height,
                              corner_radius=10, fg_color=fg, hover_color=hover,
                              text_color=txt, font=("Segoe UI", 10, "bold"), **kwargs)
 
@@ -503,8 +504,7 @@ class NTSLCoresApp(ctk.CTk):
             self._refresh_rgb()
 
     def _quick_save_favorite(self):
-        if not hasattr(self, "favorite_name"):
-            self.show_page("favorites")
+        self.show_page("favorites")
         self.favorite_entry.focus_set()
         self.status.configure(text="●  Dê um nome à cor e clique em Salvar favorita.")
 
